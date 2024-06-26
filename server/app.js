@@ -41,7 +41,7 @@ const createWorker = async () => {
     
     worker = await mediasoup.createWorker({
         rtcMinPort: 2000,
-        rtcMaxPort: 2020,
+        rtcMaxPort: 2500,
     });
         
     console.log("worker created", worker.pid);
@@ -75,27 +75,41 @@ const mediaCodecs = [
     }
 ];
 
+let count =0;
 
 
 peers.on('connection', async (socket) => {
+    count = count + 1;
+    console.log(count);
     console.log('peer connected', socket.id);
-    socket.emit('connection-success', { socketId: socket.id });
+    socket.emit('connection-success', 
+        { socketId: socket.id,
+            existsProducer: producer ? true : false,
+         });
 
 
     socket.on('disconnect', () => {
         console.log('peer disconnected', socket.id);
     });
 
-    router = await worker.createRouter({
-        mediaCodecs: mediaCodecs
-    });
+    socket.on('createRoom', async (callback) => {
+        if(router === undefined){
+            router = await worker.createRouter({
+                mediaCodecs: mediaCodecs
+            });
 
+            console.log("router created", router.id);
+        }
 
-    socket.on('getRtpCapabilities', (callback) => {
         const rtpCapabilities = router.rtpCapabilities;
-        console.log('rtpCapabilities', rtpCapabilities);
+        // console.log('rtpCapabilities', rtpCapabilities);
         callback({rtpCapabilities});
     })
+
+
+
+    const getRTPCapabilities = (callback) => {
+    }
 
 
     socket.on('createWebRtcTransport', async ({sender}, callback) => {
@@ -107,7 +121,7 @@ peers.on('connection', async (socket) => {
 
 
     socket.on('transport-connect', async ({ dtlsParameters }) => {
-        console.log("DTLS Params", {dtlsParameters});
+        // console.log("DTLS Params", {dtlsParameters});
         await producerTransport.connect({ dtlsParameters });
     })
 
@@ -169,7 +183,7 @@ peers.on('connection', async (socket) => {
               callback({ params })
             }
           } catch (error) {
-            console.log(error.message)
+            console.log('consumer side',error.message)
             callback({
               params: {
                 error: error
@@ -225,7 +239,7 @@ const createWebRtcTransport = async (callback) => {
         return transport
     }
     catch(err){
-        console.log(err);
+        console.log('createWebRtcTransport wala error',err);
         callback({
             params: {
                 error: err
